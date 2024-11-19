@@ -2,13 +2,13 @@ CREATE VIEW allCustomerAccounts AS
 SELECT
       cp.nationalID,cp.first_name,cp.last_name,
       cp.email,cp.address,cp.date_of_birth,
-      ca.status
+      ca.statusCA
 FROM
       Customer_profile cp
 JOIN
       Customer_Account ca ON cp.nationalID = ca.nationalID
 WHERE 
-      ca.status='active';
+      ca.statusCA='active';
 
 
 GO
@@ -34,7 +34,7 @@ GO
 CREATE VIEW AccountPayments AS
 SELECT
       p.paymentID,p.amount,p.date_of_payment,p.payment_method,
-      p.status,ca.mobileNo,ca.account_type,ca.balance,ca.status,ca.point
+      p.statusPay,ca.mobileNo,ca.account_type,ca.balance,ca.statusCA,ca.points
 FROM
      payment p
 JOIN
@@ -51,7 +51,7 @@ GO
 
 CREATE VIEW allResolvedTickets AS
 SELECT * FROM Technical_Support_Ticket
-WHERE status='Resolved';
+WHERE statusTECH='Resolved';
 
 
 GO
@@ -89,7 +89,7 @@ GO
 
 CREATE VIEW PhysicalStoreVouchers AS
 SELECT
-       s.shopID ,s.address,s.working_hour.v.voucherID,v.value
+       s.shopID ,s.address,s.working_hours,v.voucherID,v.value
 FROM
        Physical_Shop s
 INNER JOIN
@@ -111,5 +111,3 @@ FROM
     Cashback
 GROUP BY 
     Cashback.walletID;
-
-go
