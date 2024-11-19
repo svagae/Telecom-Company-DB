@@ -1,10 +1,8 @@
-GO
 CREATE VIEW allCustomerAccounts AS
 SELECT
       cp.nationalID,cp.first_name,cp.last_name,
       cp.email,cp.address,cp.date_of_birth,
-      ca.mobileNo,ca.account_type,ca.balance,
-      ca.start_date,ca.status,ca.point
+      ca.status
 FROM
       Customer_profile cp
 JOIN
@@ -14,8 +12,12 @@ WHERE
 
 
 GO
+
+
 CREATE VIEW allSevicePlans AS
 SELECT * FROM Service_Plan;
+
+
 GO
 
 
@@ -42,14 +44,17 @@ GO
 
 CREATE VIEW allShops AS
 SELECT* FROM Shop ;
-GO
+
 
 GO
+
+
 CREATE VIEW allResolvedTickets AS
 SELECT * FROM Technical_Support_Ticket
 WHERE status='Resolved';
-GO
 
+
+GO
 
 
 CREATE VIEW CustomerWallet AS
@@ -60,6 +65,10 @@ FROM
 INNER JOIN
       Customer_profile cp
 ON w.nationalID =cp.nationalID ;
+
+
+
+
 GO
 
 
@@ -73,9 +82,11 @@ INNER JOIN
 ON s.shopID = v.shopID
 
 WHERE v.redeem_date IS NOT NULL;
-GO
+
 
 GO
+
+
 CREATE VIEW PhysicalStoreVouchers AS
 SELECT
        s.shopID ,s.address,s.working_hour.v.voucherID,v.value
@@ -86,10 +97,19 @@ INNER JOIN
 ON s.shopID = v.shopID
 
 WHERE v.redeem_date IS NOT NULL;
+
+
+
 GO
 
 
 CREATE VIEW Num_of_cashback AS
-SELECT COUNT (CashbackID)
-FROM Cashback
-GROUP BY Cashback.walletID; 
+SELECT 
+    Cashback.walletID,
+    COUNT(Cashback.CashbackID) AS number_of_cashbacks
+FROM 
+    Cashback
+GROUP BY 
+    Cashback.walletID;
+
+go
