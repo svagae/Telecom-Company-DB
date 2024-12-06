@@ -1,113 +1,296 @@
-CREATE VIEW allCustomerAccounts AS
-SELECT
-      cp.nationalID,cp.first_name,cp.last_name,
-      cp.email,cp.address,cp.date_of_birth,
-      ca.statusCA
-FROM
-      Customer_profile cp
-JOIN
-      Customer_Account ca ON cp.nationalID = ca.nationalID
-WHERE 
-      ca.statusCA='active';
+-----------------------------------Views------------------------------------------------------------------------------------------
+-----------------------------------Basic Data Retrieval------------------------------------------------------------------------------------------
 
+
+-----------------------------------allCustomerAccounts------------------------------------------------------------------------------------------
+-------------------Fetch details for all customer profiles along with their active accounts---------------------
+GO
+CREATE VIEW [allCustomerAccounts] AS
+SELECT p.*,a.mobileNo,a.account_type,a.status,a.start_date,a.balance,a.points from customer_profile p
+inner join customer_account a 
+on p.nationalID = a.nationalID
+where a.status = 'active'
+
+GO
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------allServicePlans------------------------------------------------------------------------------------------
+-------------------Fetch details for all offered Service Plans---------------------
+
+GO
+CREATE VIEW [allServicePlans] AS
+select * from Service_plan
+GO
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------allBenefits------------------------------------------------------------------------------------------
+-------------------Fetch details for all active Benefits---------------------
+GO
+CREATE VIEW [allBenefits] AS
+select * from Benefits
+where status = 'active'
+GO
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------AccountPayments------------------------------------------------------------------------------------------
+-----------Fetch details for all payments along with their corresponding Accounts---------------------
+
+GO
+CREATE VIEW [AccountPayments] AS
+select * from Payment p
+
+GO
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------allShops------------------------------------------------------------------------------------------
+-----------Fetch details for all shops.---------------------
+GO
+CREATE VIEW [allShops] AS
+select * from shop 
+GO
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------allResolvedTickets------------------------------------------------------------------------------------------
+-----------Fetch details for all resolved tickets---------------------
+GO
+CREATE VIEW [allResolvedTickets] AS
+select * from Technical_support_ticket
+where status = 'Resolved'
+GO
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------CustomerWallet------------------------------------------------------------------------------------------
+-----------Fetch details of all wallets along with their customer names---------------------
+GO
+CREATE VIEW [CustomerWallet] AS
+select w.*,p.first_name,p.last_name from Wallet w
+inner join customer_profile p
+on w.nationalID = p.nationalID
+
+GO
+
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------E_shopVouchers------------------------------------------------------------------------------------------
+-----------Fetch the list of all E-shops along with their redeemed vouchers’s ids and values---------------------
+GO
+CREATE VIEW [E_shopVouchers] AS
+select e.*, v.voucherID,v.value from E_shop e
+inner join Voucher v
+on e.shopID = v.shopid
+
+GO
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------PhysicalStoreVouchers------------------------------------------------------------------------------------------
+-----------Fetch the list of all physical stores along with their redeemed vouchers’s ids and values.---------------------
+GO
+CREATE VIEW [PhysicalStoreVouchers] AS
+select p.*, v.voucherID,v.value from Physical_shop p
+inner join Voucher v
+on p.shopID = v.shopid
+
+GO
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----------------------------------Num_of_cashback------------------------------------------------------------------------------------------
+-----------Fetch number of cashback transactions per each wallet---------------------
+GO
+CREATE VIEW [Num_of_cashback] AS
+select walletID,count(*)as 'count of transactions' from Cashback
+group by walletID
 
 GO
 
 
-CREATE VIEW allSevicePlans AS
-SELECT * FROM Service_Plan;
-
-
+-----------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------Account_Plan Procedure------------------------------------------------------------
+-- List all accounts along with the service plans they are subscribed to ----------------------------------------------------
+go
+create Procedure [Account_Plan]
+AS
+Select customer_account.*, Service_plan.* from customer_account inner join Subscription
+on customer_account.mobileNo = Subscription.mobileNo inner join Service_plan on Subscription.planID = Service_plan.planID
 GO
 
-
-CREATE VIEW allBenefits AS
-SELECT
-      benefitID,description,validity_date,status,mobileNo
-FROM
-      Benefits
-WHERE
-     status = 'active';
-
-GO
-
-CREATE VIEW AccountPayments AS
-SELECT
-      p.paymentID,p.amount,p.date_of_payment,p.payment_method,
-      p.statusPay,ca.mobileNo,ca.account_type,ca.balance,ca.statusCA,ca.points
-FROM
-     payment p
-JOIN
-     Customer_Account ca ON p.mobileNo = ca.mobileNo;
-
-GO
-
-CREATE VIEW allShops AS
-SELECT* FROM Shop ;
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-GO
+------------------------------------Account_Plan_date Table Valued Function---------------------------------------------------------
+-----Retrieve the list of accounts subscribed to the input plan on a certain date--------------------------------
+go
+CREATE FUNCTION [Account_Plan_date]
+(@sub_date date, @plan_id int) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return (Select customer_account.mobileNo, Service_plan.planID, Service_plan.name from customer_account inner join Subscription
+on customer_account.mobileNo = Subscription.mobileNo inner join Service_plan on Subscription.planID = Service_plan.planID
+WHERE Subscription.subscription_date = @sub_date AND Service_plan.planID = @plan_id)
+go
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
 
+-----------------------------Account_Usage_Plan table valued function-------------------------------------------------------
+--Retrieve the total usage of the input account on each subscribed plan from a given input date.
+go
+create FUNCTION [Account_Usage_Plan]
+(@mobile_num char(11), @start_date date) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return (Select Plan_Usage.planID, sum(Plan_Usage.data_consumption) as 'total data' ,sum(Plan_Usage.minutes_used) as 'total mins',sum(Plan_Usage.SMS_sent) as 'total SMS'
+from Plan_Usage
+where  Plan_Usage.mobileNo = @mobile_num and Plan_Usage.start_date >= @start_date
+group by Plan_Usage.planID)
+go
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
 
-CREATE VIEW allResolvedTickets AS
-SELECT * FROM Technical_Support_Ticket
-WHERE statusTECH='Resolved';
+---------------------------------Benefits_Account  -------------------------------------------------------------------------
+---------Delete all benefits offered to the input account for a certain plan-------------------
+go
+CREATE PROCEDURE [Benefits_Account]
+@mobile_num char(11), @plan_id int
 
+AS
+update Benefits
+set mobileNo = null
+from  Benefits B inner join plan_provides_benefits pb
+on B.benefitID = pb.benefitid 
+where B.mobileNo = @mobile_num and pb.planID = @plan_id
+go
+/*
+delete B from Benefits B inner join plan_provides_benefits pb
+on B.benefitID = pb.benefitid 
+where B.mobileNo = 01234567890 and pb.planID = 1
+*/
 
-GO
-
-
-CREATE VIEW CustomerWallet AS
-SELECT 
-      w.walletID, w.current_balance, w.currency , w.last_modified_date , w.nationalID, w.mobileNo, cp.first_name, cp.last_name 
-FROM
-      Wallet w
-INNER JOIN
-      Customer_profile cp
-ON w.nationalID =cp.nationalID ;
-
-
-
-
-GO
-
-
-CREATE VIEW E_shopVouchers AS
-SELECT
-       s.shopID ,s.URL,s.rating,v.voucherID,v.value
-FROM
-       E_shop s
-INNER JOIN
-       Voucher v
-ON s.shopID = v.shopID
-
-WHERE v.redeem_date IS NOT NULL;
-
-
-GO
-
-
-CREATE VIEW PhysicalStoreVouchers AS
-SELECT
-       s.shopID ,s.address,s.working_hours,v.voucherID,v.value
-FROM
-       Physical_Shop s
-INNER JOIN
-       Voucher v
-ON s.shopID = v.shopID
-
-WHERE v.redeem_date IS NOT NULL;
+---must also delete any of the subclasses that have this benefit_id if using delete 
+--delete from benefit or update mobile number to Null !!!!!!!
 
 
 
-GO
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+---------------------------------Account_SMS_Offers  -------------------------------------------------------------------------
+---------Retrieve the list of gained offers of type ‘SMS’ for the input account-------------------
+go
+CREATE FUNCTION [Account_SMS_Offers]
+(@mobile_num char(11)) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return(Select o.* from Exclusive_offer o inner join Benefits b 
+on o.benefitID = b.benefitID 
+where b.mobileNo = @mobile_num and o.SMS_offered >0 )
+go 
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+---------------------------------Account_Payment  -------------------------------------------------------------------------
+---------Get the number of accepted  payment transactions initiated by the input account during the last year--------------------
+go
+CREATE PROCEDURE [Account_Payment_Points]
+@mobile_num char(11)
+
+AS
+select count(p.paymentID), sum(pb.pointsAmount) from Payment P
+inner join Points_group pb 
+on p.paymentID = pb.paymentId
+where P.mobileNo = @mobile_num and (year(current_timestamp) - year(p.date_of_payment)=1 ) 
+and P.status = 'successful'
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+---------------------------------Wallet_Cashback_Amount-------------------------------------------------------------------------
+---------Retrieve the amount of cashback returned on the input wallet--------------------
+
+go
+CREATE FUNCTION [Wallet_Cashback_Amount]
+(@walletID int, @planID int) --Define Function Inputs
+RETURNS int -- Define Function Output
+AS
+Begin
+declare @amount int
+
+set @amount = (Select sum(c.amount) from Cashback c 
+inner join plan_provides_benefits pb 
+on c.benefitID = pb.benefitid
+where c.walletID = @walletID and pb.planID = @planID)
+
+return @amount
+END
+go
 
 
-CREATE VIEW Num_of_cashback AS
-SELECT 
-    Cashback.walletID,
-    COUNT(Cashback.CashbackID) AS number_of_cashbacks
-FROM 
-    Cashback
-GROUP BY 
-    Cashback.walletID;
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+---------------------------------Wallet_Transfer_Amount-------------------------------------------------------------------------
+---------Retrieve the average of the sent transaction amounts from the input wallet within a certain duration.--------------------
+go
+CREATE FUNCTION [Wallet_Transfer_Amount]
+(@walletID int, @start_date date, @end_date date) --Define Function Inputs
+RETURNS int -- Define Function Output
+AS
+Begin
+declare @avg int
+
+set @avg = (Select avg(t.amount) from transfer_money t
+where t.walletID1 = @walletID and t.transfer_date between @start_date and @end_date)
+
+return @avg
+END
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+---------------------------------Wallet_MobileNo-------------------------------------------------------------------------
+-----------------------------Take mobileNo as an input, return true if this number is linked to a wallet, otherwise return false.
+go
+CREATE FUNCTION [Wallet_MobileNo]
+(@mobile_num char(11)) --Define Function Inputs
+RETURNS bit -- Define Function Output
+AS
+Begin
+declare @output bit
+IF exists((Select w.walletID from Wallet w
+where w.mobileNo = @mobile_num ))
+set @output = 1
+else 
+set @output = 0
+
+return @output
+END
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Total_Points_Account-----------------------
+------------------------- Update the total number of points that the input account should have--------------------------
+
+go
+CREATE PROCEDURE [Total_Points_Account]
+@mobile_num char(11)  
+
+AS
+declare @sum int
+select @sum =  sum(pg.pointsAmount) from Points_group pg
+inner join Payment p
+on pg.paymentId = p.paymentID
+where p.mobileNo = @mobile_num
+
+update customer_account  
+set points = @sum
+where mobileNo = @mobile_num
+
+delete from Points_group
+where pointId in  (select pg.pointId from Points_group pg
+inner join Payment p on pg.paymentId = p.paymentID
+where p.mobileNo = @mobile_num)
+go
