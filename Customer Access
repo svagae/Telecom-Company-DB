@@ -1,20 +1,299 @@
-CREATE PROCEDURE Unsubscribed_Plans(IN MobileNo CHAR(11))
-BEGIN
-    
-    SELECT 
-        sp.planID,
-        sp.name AS plan_name,
-        sp.price AS plan_price,
-        sp.SMS_offered,
-        sp.minutes_offered,
-        sp.data_offered,
-        sp.description
-    FROM 
-        Service_Plan sp
-    LEFT JOIN 
-        Subscription s ON sp.planID = s.planID AND s.mobileNo = MobileNo
-    WHERE 
-        s.mobileNo IS NULL; 
-END 
+go
+CREATE FUNCTION [AccountLoginValidation]
+(@mobile_num Varchar(11), @pass varchar(50)) --Define Function Inputs
+RETURNS INT -- Define Function Output
+AS
+Begin
+declare @output bit
+IF exists((Select a.mobileNo from customer_account a
+where a.mobileNo = @mobile_num and a.pass = @pass ))
+set @output = 1
+else 
+set @output = 0
+
+return @output
+END
+go
+
+drop function AccountLoginValidation
 
 
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Consumption-----------------------
+-------------------------Retrieve the total SMS, Mins and Internet consumption for an input plan within a certain duration--------------------------
+
+go
+CREATE FUNCTION [Consumption]
+(@Plan_name varchar(50), @start_date date, @end_date date) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return(Select p.data_consumption,p.minutes_used,p.SMS_sent from Plan_Usage p 
+inner join Service_plan s on s.planID = p.planID
+where s.name = @Plan_name and p.start_date >= @start_date and p.end_date <= @end_date)
+go
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Unsubscribed_Plans-----------------------
+-------------------------Retrieve all offered plans that the input customer is not subscribed to--------------------------
+go
+CREATE PROCEDURE [Unsubscribed_Plans]
+@mobile_num char(11)
+
+AS
+select  sp.* from  Service_plan sp 
+where sp.planID not in (
+select s.planID  from Subscription s
+where s.mobileNo = @mobile_num)
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Usage_Plan_CurrentMonth-----------------------
+-------------------------Retrieve the usage of all active plans for the input account in the current month--------------------------
+
+go
+CREATE FUNCTION [Usage_Plan_CurrentMonth]
+(@mobile_num char(11)) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return(select p.data_consumption, p.minutes_used, p.SMS_sent from Plan_Usage p
+inner join Subscription s 
+on p.planID = s.planID and p.mobileNo = s.mobileNo
+where p.mobileNo = @mobile_num and s.status = 'active' 
+and month(p.start_date)= month(current_timestamp) or month(p.end_date)= month(current_timestamp) and year(p.start_date)= year(current_timestamp) or year(p.end_date)= year(current_timestamp))
+go 
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Cashback_Wallet_Customer-----------------------
+------------------------- Retrieve all cashback transactions related to the wallet of the input customer--------------------------
+
+go
+CREATE FUNCTION [Cashback_Wallet_Customer]
+(@NID int) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return(select c.* from Cashback c 
+inner join Wallet w 
+on c.walletID = w.walletID 
+where w.nationalID = @NID)
+go 
+
+
+
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Ticket_Account_Customer-----------------------
+------------------------- Retrieve the number of technical support tickets that are NOT ‘Resolved’ for each account of the input customer--------------------------
+
+go
+CREATE PROCEDURE [Ticket_Account_Customer]
+@NID int 
+
+AS
+select count(t.ticketID) from Technical_support_ticket t
+inner join customer_account a 
+on t.mobileNo = a.mobileNo
+where t.status <> 'resolved' and a.nationalID = @NID
+go
+
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Account_Highest_Voucher-----------------------
+------------------------- Return the voucher with the highest value for the input account.--------------------------
+
+go
+CREATE PROCEDURE [Account_Highest_Voucher]
+@mobile_num char(11)  
+
+AS
+declare @max int
+select @max =  max(v.value) from Voucher v 
+where v.mobileNo = @mobile_num 
+
+select v.voucherID from voucher v
+where v.mobileNo = @mobile_num and v.value = @max
+
+go
+
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Remaining_plan_amount-----------------------
+------------------------- Get the remaining amount for a certain plan based on the payment initiated by the input account--------------------------
+go
+CREATE FUNCTION [Remaining_plan_amount]
+(@mobile_num char(11), @plan_name varchar(50)) --Define Function Inputs
+RETURNS int -- Define Function Output
+AS
+Begin
+declare @output int, @plan_id int, @payment_id int
+Select @plan_id = s.planID, @payment_id= p.paymentID from Service_plan s inner join process_payment pp
+on s.planID = pp.planID inner join payment p 
+on pp.paymentID = p.paymentID
+where s.name = @plan_name and p.mobileNo = @mobile_num and p.status='successful'
+
+set @output = dbo.function_remaining_amount(@payment_id,@plan_id)
+return @output
+END
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Extra_plan_amount-----------------------
+-------------------------Get the extra amount from a payment initiated by the input account for a certain plan--------------------------
+go
+CREATE FUNCTION [Extra_plan_amount]
+(@mobile_num char(11), @plan_name varchar(50)) --Define Function Inputs
+RETURNS int -- Define Function Output
+AS
+Begin
+declare @output int, @plan_id int, @payment_id int
+Select @plan_id = s.planID, @payment_id= p.paymentID from Service_plan s inner join process_payment pp
+on s.planID = pp.planID inner join payment p 
+on pp.paymentID = p.paymentID
+where s.name = @plan_name and p.mobileNo = @mobile_num and p.status='successful'
+
+set @output = dbo.function_extra_amount(@payment_id,@plan_id)
+return @output
+END
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Top_Successful_Payments-----------------------
+-------------------------Retrieve the top 10 successful payments with highest value for the input account--------------------------
+go
+CREATE PROCEDURE [Top_Successful_Payments]
+@mobile_num char(11)  
+
+AS
+select top 10 p.* from Payment p 
+where p.mobileNo = @mobile_num
+and p.status = 'successful'
+order by p.amount desc
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Subscribed_plans_5_Months-----------------------
+-------------------------Retrieve all service plans the input account subscribed to in the past 5 months--------------------------
+
+go
+CREATE FUNCTION [Subscribed_plans_5_Months]
+(@MobileNo char(11)) --Define Function Inputs
+RETURNS Table -- Define Function Output
+AS
+Return(Select sp.* from Service_plan sp 
+inner join Subscription s 
+on sp.planID = s.planID
+where s.mobileNo = @MobileNo and 
+s.subscription_date >= DATEADD(month,-5,CURRENT_TIMESTAMP))
+go 
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Initiate_plan_payment-----------------------
+-------------------------Initiate an accepted payment for the input account for plan renewal and update the status of the subscription accordingly.--------------------------
+
+go
+CREATE PROCEDURE [Initiate_plan_payment]
+@mobile_num char(11), @amount decimal(10,1), @payment_method varchar(50),
+@plan_id int 
+
+AS
+declare @payment_id int
+Insert into Payment (amount,date_of_payment,payment_method,status,mobileNo)
+values(@amount,CURRENT_TIMESTAMP,@payment_method,'successful',@mobile_num)
+SELECT @payment_id = p.paymentID from Payment p    
+where p.mobileNo = @mobile_num and p.amount = @amount and p.date_of_payment = CAST(CURRENT_TIMESTAMP AS DATE)
+and p.payment_method = @payment_method and p.status = 'successful'
+Insert into process_payment(paymentID, planID) values(@payment_id, @plan_id)
+if(select remaining_amount from process_payment where planID = @plan_id and paymentID = @payment_id) = 0 
+update Subscription
+set status = 'active'
+where planID = @plan_id and mobileNo = @mobile_num
+else
+update Subscription
+set status = 'onhold'
+where planID = @plan_id and mobileNo = @mobile_num
+
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Payment_wallet_cashback-----------------------
+-------------------------Calculate the amount of cashback that will be returned on the wallet of the customer of the input account from a certain payment--------------------------
+
+go
+CREATE PROCEDURE [Payment_wallet_cashback]
+@mobile_num char(11), @payment_id int, @benefit_id int 
+
+AS
+declare @amount int, @cash_amount int, @wallet_id int 
+select @amount = p.amount  from Payment p
+where p.paymentID = @payment_id and p.status = 'successful'
+set @cash_amount = 0.1 * @amount
+select @wallet_id = w.walletID from Wallet w
+inner join customer_account a on
+w.nationalID = a.nationalID 
+where a.mobileNo = @mobile_num
+
+Insert into Cashback(benefitID,walletID,amount,credit_date)
+values(@benefit_id,@wallet_id,@cash_amount,current_timestamp)
+
+update Wallet
+set current_balance = current_balance + @cash_amount,
+last_modified_date = current_timestamp
+where walletID = @wallet_id
+
+go
+
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Initiate_balance_payment-----------------------
+-------------------------Initiate an accepted payment for the input account for balance recharge--------------------------
+go
+CREATE PROCEDURE [Initiate_balance_payment]
+@mobile_num char(11), @amount decimal(10,1), @payment_method varchar(50)
+
+as
+Insert into Payment (amount,date_of_payment,payment_method,status,mobileNo)
+values(@amount,CURRENT_TIMESTAMP,@payment_method,'successful',@mobile_num)
+
+update customer_account
+set balance = balance + @amount
+where mobileNo = @mobile_num
+
+go
+
+--//////////////////////////////////////////////////////////////////////////////////////////////////////
+------------------------------------------------------------------------------------------------------------
+----------------------------------------Redeem_voucher_points-----------------------
+------------------------- Redeem a voucher for the input account and update the total points of the account accordingly--------------------------
+go
+CREATE PROCEDURE [Redeem_voucher_points]
+@mobile_num char(11), @voucher_id int 
+
+AS
+If (Select v.points from Voucher v 
+where v.voucherID = @voucher_id and v.expiry_date >CURRENT_TIMESTAMP ) <= (Select a.points from customer_account a 
+where a.mobileNo = @mobile_num) 
+begin 
+declare @voucher_points int 
+select @voucher_points = points from Voucher
+where voucherID = @voucher_id
+update Voucher
+set mobileNo = @mobile_num , redeem_date = current_timestamp 
+where voucherID = @voucher_id 
+
+update customer_account
+set points = points - @voucher_points
+where mobileNo = @mobile_num
+end 
+else 
+print 'no enough points to redeem voucher'
