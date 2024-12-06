@@ -1,19 +1,111 @@
-CREATE PROCEDURE Account_Plan()
-AS
-    
-    SELECT 
-        ca.mobileNo,
-        ca.account_type,
-        ca.status AS account_status,
-        sp.planID,
-        sp.name AS plan_name,
-        sp.price AS plan_price,
-        s.subscription_date,
-        s.status AS subscription_status
-    FROM 
-        Customer_Account ca
-    LEFT JOIN 
-        Subscription s ON ca.mobileNo = s.mobileNo
-    LEFT JOIN 
-        Service_Plan sp ON s.planID = sp.planID;
+--------------------Admin Executions--------------------------------------------
+-----------------------Account_Plan Procedure----------------------------------
+Exec Account_Plan
 
+-----------------Account_Plan_date Table Valued Function--------------
+select * from dbo.Account_Plan_date ('2023-01-01',1)
+
+-----------------Account_Usage_Plan function execution-------------------------------------------
+select * from Plan_Usage
+
+select * from dbo.Account_Usage_Plan ('01234567895', '2023-05-01')
+
+-------------------Benefits_Account procedure execution---------------------------------------------------------------------------------
+
+Exec Benefits_Account @mobile_num ='01234567891', @plan_id = 1 
+-------------------Account_SMS_Offers function execution---------------------------------------------------------------------------------
+
+select * from dbo.Account_SMS_Offers ('01234567891')
+
+-----------------------Account_Payment_Points Procedure execution----------------------------------
+Exec Account_Payment_Points @mobile_num ='01234567891'
+
+-------------------[Wallet_Cashback_Amount] function execution---------------------------------------------------------------------------------
+
+declare @result int
+set @result = dbo.Wallet_Cashback_Amount(3,3)
+print @result
+
+-------------------[Wallet_Transfer_Amount] function execution---------------------------------------------------------------------------------
+
+declare @result int
+set @result = dbo.Wallet_Transfer_Amount(1,'','')
+print @result
+
+-------------------[Wallet_MobileNo] function execution---------------------------------------------------------------------------------
+
+declare @result bit
+set @result = dbo.Wallet_MobileNo('01234567891')
+print @result
+
+-----------------------Total_Points_Account Procedure execution----------------------------------
+Exec Total_Points_Account @mobile_num ='01234567890'
+
+
+
+----------------------------Customer Executions------------------------------------
+-------------------[AccountLoginValidation] function execution---------------------------------------------------------------------------------
+
+declare @result bit
+set @result = dbo.AccountLoginValidation('01234567414','password1')
+print @result
+
+-------------------Consumption function execution---------------------------------------------------------------------------------
+
+select * from dbo.Consumption (1, '2023-01-01','2023-01-31')
+
+-----------------------Unsubscribed_Plans Procedure execution----------------------------------
+
+Exec Unsubscribed_Plans @mobile_num = '01234567890'
+
+-------------------Usage_Plan_CurrentMonth function execution---------------------------------------------------------------------------------
+
+select * from dbo.Usage_Plan_CurrentMonth ('01234567890')
+
+-------------------Cashback_Wallet_Customer function execution---------------------------------------------------------------------------------
+
+select * from dbo.Cashback_Wallet_Customer (3)
+
+-----------------------Ticket_Account_Customer Procedure execution----------------------------------
+
+Exec Ticket_Account_Customer @NID = 1
+
+-----------------------Account_Highest_Voucher Procedure execution----------------------------------
+
+Exec Account_Highest_Voucher @mobile_num = '01234567890'
+
+-------------------Remaining_plan_amount function execution---------------------------------------------------------------------------------
+
+declare @result bit
+set @result = dbo.Remaining_plan_amount('Basic Plan','01234567890')
+print @result
+
+-------------------Extra_plan_amount function execution---------------------------------------------------------------------------------
+
+declare @result bit
+set @result = dbo.Extra_plan_amount('Basic Plan','01234567890')
+print @result
+
+-----------------------Top_Successful_Payments Procedure execution----------------------------------
+
+Exec Top_Successful_Payments @mobile_num = '01234567890'
+
+-------------------Subscribed_plans_5_Months function execution---------------------------------------------------------------------------------
+
+select * from dbo.Subscribed_plans_5_Months ('01234567890')
+
+-----------------------Initiate_plan_payment Procedure execution----------------------------------
+
+Exec Initiate_plan_payment @mobile_num = '01234567890', @amount =100, @payment_method = 'cash',
+@plan_id = 3
+-----------------------Payment_wallet_cashback Procedure execution----------------------------------
+
+Exec Payment_wallet_cashback @mobile_num = '01234567892',@payment_id = 8, @benefit_id = 3
+
+-----------------------Initiate_balance_payment Procedure execution----------------------------------
+
+Exec Initiate_balance_payment @mobile_num = '01234567890', @amount =100, @payment_method = 'cash'
+
+-----------------------Redeem_voucher_points Procedure execution----------------------------------
+
+Exec Redeem_voucher_points @mobile_num = '01234567890', @voucher_id = 3 
