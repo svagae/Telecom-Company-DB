@@ -1,307 +1,255 @@
-CREATE DATABASE Telecom_Team_Team_66;
+CREATE PROCEDURE [createAllTables]
+
+AS
+
+create table customer_profile(
+nationalID int primary key,
+first_name varchar(50) not null, 
+last_name varchar(50) not null,
+email varchar(50),
+address varchar(70) not null, 
+date_of_birth date
+)
+
+
+create table customer_account(
+mobileNo char(11) primary key,
+pass varchar(50),
+balance decimal(10,1),
+account_type varchar(50) check(account_type = 'postpaid' or account_type = 'prepaid' or account_type = 'pay-as-you-go' ),
+start_date date not null,
+status varchar(50) check(status = 'active' or status = 'onhold'),
+points int default 0,
+nationalID int,
+FOREIGN KEY (nationalID) REFERENCES customer_profile (nationalID)
+)
+
+create table Service_plan(
+planID int identity primary key,
+name varchar(50) not null,
+price int not null,
+SMS_offered int not null,
+minutes_offered int not null,
+data_offered int not null,
+description varchar(50)
+)
+
+create table Subscription(
+mobileNo Char(11),
+planID int,
+subscription_date date,
+status varchar(50) check(status='active' or status='onhold'),
+constraint pk_subscription primary key (mobileNo,planID),
+FOREIGN KEY (mobileNo) REFERENCES customer_account (mobileNo),
+FOREIGN KEY (planID) REFERENCES Service_plan (planID)
+)
+
+create table Plan_Usage(
+usageID int identity primary key,
+start_date date not null,
+end_date date not null,
+data_consumption int,
+minutes_used int ,
+SMS_sent int  , 
+mobileNo Char(11) , 
+planID int,
+FOREIGN KEY (mobileNo) REFERENCES customer_account (mobileNo),
+FOREIGN KEY (planID) REFERENCES Service_plan (planID)
+)
+
+
+create table Payment(
+paymentID int identity primary key,
+amount decimal(10,1) not null,
+date_of_payment date not null,
+payment_method varchar(50) check(payment_method ='cash' or payment_method ='credit'),
+status varchar(50) check(status ='successful' or status='rejected' or status='pending'),
+mobileNo Char(11),
+FOREIGN KEY (mobileNo) REFERENCES customer_account (mobileNo)
+)
+
+
+
+
+create table process_payment(
+paymentID int,
+planID int,
+FOREIGN KEY (paymentID) REFERENCES Payment (paymentID),
+FOREIGN KEY (planID) REFERENCES Service_plan (planID),
+
+remaining_amount as(dbo.function_remaining_amount(paymentID, planID)),
+extra_amount as (dbo.function_extra_amount(paymentID, planID)),
+
+constraint pk_process_payment primary key (paymentID) 
+)
+
+create table Wallet
+(
+walletID int identity primary key,
+current_balance decimal(10,2) default 0,
+currency varchar(50) default 'egp',
+last_modified_date date ,
+nationalID int,
+mobileNo char(11),
+FOREIGN KEY (nationalID) REFERENCES customer_profile (nationalID)
+)
+
+create table transfer_money(
+walletID1 int, 
+walletID2 int, 
+transfer_id int identity,
+amount decimal (10,2),
+transfer_date date, 
+constraint pk_transfer_money primary key (walletID1,walletID2,transfer_id),
+FOREIGN KEY (walletID1) REFERENCES Wallet(walletID),
+FOREIGN KEY (walletID2) REFERENCES Wallet (walletID)
+)
+
+create table Benefits (
+benefitID int primary key identity, 
+description varchar(50),
+validity_date date, 
+status varchar (50) check(status='active' or status ='expired'),
+mobileNo char(11), 
+FOREIGN KEY (mobileNo) REFERENCES customer_account(mobileNo)
+)
+
+create table Points_group(
+pointId int identity,
+benefitID int, 
+pointsAmount int,
+paymentId int,
+FOREIGN KEY (paymentId) REFERENCES Payment(paymentID),
+FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
+constraint pk_Points_group primary key (pointId,benefitId)
+)
+
+create table Exclusive_offer (
+offerID int identity, 
+benefitID int, 
+internet_offered int ,
+SMS_offered int,
+minutes_offered int,
+FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
+constraint pk_Exclusive_offer primary key (offerID,benefitId)
+
+)
+
+create table Cashback(
+cashbackID int identity, 
+benefitID int, 
+walletID int, 
+amount int,
+credit_date date,FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
+FOREIGN KEY (walletid) REFERENCES Wallet(walletid),
+constraint pk_Cashback primary key (cashbackID,benefitId)
+)
+
+create table plan_provides_benefits(
+benefitid int, 
+planID int, 
+FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
+FOREIGN KEY (planID) REFERENCES service_plan(planID),
+constraint pk_plan_provides_benefits primary key (planID,benefitId)
+)
+
+create table shop (
+shopID int identity primary key,
+name varchar(50),
+Category varchar(50)
+)
+create table Physical_shop (
+shopID int primary key, 
+address varchar(50),
+working_hours varchar(50),
+FOREIGN KEY (shopID) REFERENCES shop(shopID),
+)
+
+create table E_shop (
+shopID int primary key , 
+URL varchar(50) not null,
+rating int,
+FOREIGN KEY (shopID) REFERENCES shop(shopID),
+)
+
+create table Voucher (
+voucherID int identity primary key,
+value int,
+expiry_date date,
+points int, 
+mobileNo char(11),
+redeem_date date,
+shopid int, 
+FOREIGN KEY (shopID) REFERENCES shop(shopID),
+FOREIGN KEY (mobileNo) REFERENCES customer_account(mobileNo)
+)
+
+
+
+create table Technical_support_ticket (
+ticketID int identity,
+mobileNo char(11), 
+issue_description varchar(50),
+priority_level int,
+status varchar(50) check (status in ('Open','In progress','Resolved'))
+FOREIGN KEY (mobileNo) REFERENCES customer_account(mobileNo),
+constraint pk_Technical_support_ticket primary key (ticketID,mobileNo)
+)
 
 GO
 
-
-CREATE PROCEDURE createAllTables
+-------------------------------------------------------------------------------------
+------------------------remaining function--------------------------------------------
+go
+CREATE FUNCTION [function_remaining_amount]
+(@paymentId int, @planId int) --Define Function Inputs
+RETURNS int -- Define Function Output
 AS
-    
-    CREATE TABLE Customer_profile (
-        nationalID INT PRIMARY KEY,
-        first_name VARCHAR(50),
-        last_name VARCHAR(50),
-        email VARCHAR(50),
-        address VARCHAR(50),
-        date_of_birth DATE
-    );
-    
-    
-    CREATE TABLE Customer_Account (
-        mobileNo CHAR(11) PRIMARY KEY,
-        pass VARCHAR(50),
-        balance DECIMAL(10, 1),
-        account_type VARCHAR(50) CHECK (status IN('Post Paid', 'Prepaid', 'Pay_as_you_go')),
-        start_date DATE,
-        statusCA VARCHAR(50) CHECK (status IN('active', 'onhold')),
-        points INT DEFAULT 0,
-        nationalID INT,
-        FOREIGN KEY (nationalID) REFERENCES Customer_profile(nationalID)
-    );
 
-    
-    CREATE TABLE Service_Plan (
-        planID INT PRIMARY KEY,
-        SMS_offered INT,
-        minutes_offered INT,
-        data_offered INT,
-        name VARCHAR(50),
-        price INT,
-        description VARCHAR(50)
-    );
+Begin
 
-    
-    CREATE TABLE Subscription (
-        mobileNo CHAR(11),
-        planID INT,
-        subscription_date DATE,
-        statusSub VARCHAR(50) CHECK (status IN('active', 'onhold')) ,
-        PRIMARY KEY (mobileNo, planID),
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo),
-        FOREIGN KEY (planID) REFERENCES Service_Plan(planID)
-    );
+declare @amount int
 
-    
-    CREATE TABLE Plan_Usage (
-        usageID INT PRIMARY KEY,
-        start_date DATE,
-        end_date DATE,
-        data_consumption INT,
-        minutes_used INT,
-        SMS_sent INT,
-        mobileNo CHAR(11),
-        planID INT,
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo),
-        FOREIGN KEY (planID) REFERENCES Service_Plan(planID)
-    );
+If (SELECT payment.amount FROM payment WHERE payment.paymentid=@paymentId)  < (SELECT Service_plan.price FROM Service_plan
+WHERE Service_plan.planid=@planid)
 
+Set @amount =  (SELECT Service_plan.price FROM Service_plan WHERE Service_plan.planid=@planid) - (SELECT payment.amount FROM payment
+WHERE payment.paymentid=@paymentId)
 
-    CREATE TABLE Payment (
-        paymentID INT IDENTITY(1,1) PRIMARY KEY,
-        amount DECIMAL(10, 1),
-        date_of_payment DATE,
-        payment_method VARCHAR(50) CHECK (status IN ('cash', 'credit')),
-        statusPay VARCHAR(50) CHECK (status IN('successful', 'pending', 'rejected')),
-        mobileNo CHAR(11),
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo)
-    );
+Else
+Set @amount = 0
 
-    
-    CREATE TABLE Process_Payment (
-        paymentID INT PRIMARY KEY,
-        planID INT,
-        remaining_balance DECIMAL(10, 1),
-        extra_amount DECIMAL(10, 1),
-        FOREIGN KEY (paymentID) REFERENCES Payment(paymentID),
-        FOREIGN KEY (planID) REFERENCES Service_Plan(planID)
-    );
+Return @amount
 
-    
-    CREATE TABLE Wallet (
-        walletID INT PRIMARY KEY,
-        current_balance DECIMAL(10, 2),
-        currency VARCHAR(50),
-        last_modified_date DATE,
-        nationalID INT,
-        mobileNo CHAR(11),
-        FOREIGN KEY (nationalID) REFERENCES Customer_profile(nationalID),
-    
-    );
-
-    CREATE TABLE Transfer_money (
-        walletID1 INT,
-        walletID2 INT,
-        transfer_id INT ,
-        amount DECIMAL(10, 2),
-        transfer_date DATE,
-        PRIMARY KEY(walletID1,walletID2,transfer_id),
-        FOREIGN KEY (walletID1) REFERENCES Wallet(walletID),
-        FOREIGN KEY (walletID2) REFERENCES Wallet(walletID)
-    );
-
-    
-    CREATE TABLE Benefits (
-        benefitID INT PRIMARY KEY,
-        description VARCHAR(50),
-        validity_date DATE,
-        status VARCHAR(50),
-        mobileNo CHAR(11),
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo)
-    );
-
-    
-    CREATE TABLE Points_Group (
-        pointID INT ,
-        benefitID INT,
-        pointsAmount INT,
-        PaymentID INT,
-        PRIMARY KEY(pointID,benefitID),
-        FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
-        FOREIGN KEY (PaymentID) REFERENCES Payment(paymentID)
-    );
-
-
-    CREATE TABLE Exclusive_Offer (
-        offerID INT ,
-        benefitID INT,
-        internet_offered INT,
-        SMS_offered INT,
-        minutes_offered INT,
-        PRIMARY KEY(offerID,benefitID),
-        FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID)
-    );
-CREATE TABLE Cashback (
-        CashbackID INT ,
-        benefitID INT,
-        walletID INT,
-        amount DECIMAL(10, 2),
-        credit_date DATE,
-        PRIMARY KEY(CashbackID,benefitID),
-        FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
-        FOREIGN KEY (walletID) REFERENCES Wallet(walletID)
-    );
-
-    
-    CREATE TABLE Plan_Provides_Benefits (
-        benefitID INT,
-        planID INT,
-        PRIMARY KEY (benefitID, planID),
-        FOREIGN KEY (benefitID) REFERENCES Benefits(benefitID),
-        FOREIGN KEY (planID) REFERENCES Service_Plan(planID)
-    );
-
-    
-    CREATE TABLE Shop (
-        shopID INT PRIMARY KEY,
-        name VARCHAR(50),
-        category VARCHAR(50)
-    );
-
-    
-    CREATE TABLE Physical_Shop (
-        shopID INT,
-        address VARCHAR(50),
-        working_hours VARCHAR(50),
-        PRIMARY KEY (shopID),
-        FOREIGN KEY (shopID) REFERENCES Shop(shopID)
-    );
-
-    
-    CREATE TABLE E_shop (
-        shopID INT PRIMARY KEY,
-        URL VARCHAR(50),
-        rating INT,
-        FOREIGN KEY (shopID) REFERENCES Shop(shopID)
-    );
-
-    CREATE TABLE Voucher (
-        voucherID INT PRIMARY KEY,
-        value INT,
-        expiry_date DATE,
-        points INT,
-        mobileNo CHAR(11),
-        shopID INT,
-        redeem_date DATE,
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo),
-        FOREIGN KEY (shopID) REFERENCES Shop(shopID)
-    );
-
-
-    CREATE TABLE Technical_Support_Ticket (
-        ticketID INT IDENTITY(1,1) ,
-        mobileNo CHAR(11) ,
-        Issue_description VARCHAR(50),
-        priority_level INT,
-        statusTECH VARCHAR(50) CHECK (status IN ('Open', 'In Progress', 'Resolved')),
-        PRIMARY KEY (ticketID, mobileNo),
-        FOREIGN KEY (mobileNo) REFERENCES Customer_Account(mobileNo)
-    );
-
+END
 go
 
-CREATE PROCEDURE [dropAllTables]
+-------------------------------------------------------------------------------------------
+---------------------------------extra function--------------------------------------------
+go
+CREATE FUNCTION [function_extra_amount]
+(@paymentId int, @planId int) --Define Function Inputs
+RETURNS int -- Define Function Output
 AS
-    
-    DROP TABLE Transfer_money;
-    DROP TABLE Points_Group;
-    DROP TABLE Cashback;
-    DROP TABLE Exclusive_Offer;
-    DROP TABLE Plan_Provides_Benefits;
-    DROP TABLE Benefits;
-    DROP TABLE Technical_Support_Ticket;
-    DROP TABLE Voucher;
-    DROP TABLE Plan_Usage;
-    DROP TABLE Subscription;
-    DROP TABLE Payment;
-    DROP TABLE Process_Payment;
-    DROP TABLE Wallet;
-    DROP TABLE Customer_Account;
-    DROP TABLE Service_Plan;
-    DROP TABLE Customer_profile;
-    DROP TABLE E_shop;
-    DROP TABLE Physical_Shop;
-    DROP TABLE Shop;
+
+Begin
+
+declare @amount int
+
+If (SELECT payment.amount FROM payment WHERE payment.paymentid=@paymentId)  > (SELECT Service_plan.price FROM Service_plan
+WHERE Service_plan.planid=@planid)
+
+Set @amount = (SELECT payment.amount FROM payment WHERE payment.paymentid=@paymentId) - (SELECT Service_plan.price FROM Service_plan WHERE Service_plan.planid=@planid)
+
+Else
+Set @amount = 0
+
+Return @amount
+
+END
 
 go
+-----------------------------------------------------------------------------------------------------------------------------
+--////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-CREATE PROCEDURE dropAllProceduresFunctionsViews
-AS
-    DROP VIEW allCustomerAccounts
-    DROP VIEW allServicePlans
-    DROP VIEW allBenefits
-    DROP VIEW AccountPayments
-    DROP VIEW allShops
-    DROP VIEW allResolvedTickets
-    DROP VIEW CustomerWallet
-    DROP VIEW E_shopVouchers
-    DROP VIEW PhysicalStoreVouchers
-    DROP VIEW Num_of_cashback
-    DROP FUNCTION Account_Plan_date
-    DROP FUNCTION Account_Usage_Plan
-    DROP FUNCTION Account_SMS_Offers
-    DROP FUNCTION Wallet_Cashback_Amount
-    DROP FUNCTION Wallet_Transfer_Amount
-    DROP FUNCTION Wallet_MobileNo
-    DROP FUNCTION AccountLoginValidation
-    DROP FUNCTION Consumption
-    DROP FUNCTION Usage_Plan_CurrentMonth
-    DROP FUNCTION Cashback_Wallet_Customer
-    DROP FUNCTION Remaining_plan_amount
-    DROP FUNCTION Extra_plan_amount
-    DROP FUNCTION Subscribed_plans_5_Months                                                                                                                                             
-    DROP PROCEDURE createAllTables
-    DROP PROCEDURE dropAllTables
-    DROP PROCEDURE clearAllTables
-    DROP PROCEDURE Account_Plan
-    DROP PROCEDURE Benefits_Account
-    DROP PROCEDURE Account_Payment_Points
-    DROP PROCEDURE Total_Points_Account
-    DROP PROCEDURE Unsubscribed_Plans
-    DROP PROCEDURE Ticket_Account_Customer
-    DROP PROCEDURE Account_Highest_Voucher
-    DROP PROCEDURE Top_Successful_Payments
-    DROP PROCEDURE Initiate_plan_payment
-    DROP PROCEDURE Payment_wallet_cashback
-    DROP PROCEDURE Initiate_balance_payment
-    DROP PROCEDURE Redeem_voucher_points
-
-
-
-go
-
-
-
-
-
-
-CREATE PROCEDURE clearAllTables
-AS
-    
-    TRUNCATE TABLE Transfer_money;
-    TRUNCATE TABLE Points_Group;
-    TRUNCATE TABLE Cashback;
-    TRUNCATE TABLE Exclusive_Offer;
-    TRUNCATE TABLE Plan_Provides_Benefits;
-    TRUNCATE TABLE Benefits;
-    TRUNCATE TABLE Technical_Support_Ticket;
-    TRUNCATE TABLE Voucher;
-    TRUNCATE TABLE Plan_Usage;
-    TRUNCATE TABLE Subscription;
-    TRUNCATE TABLE Process_Payment;
-    TRUNCATE TABLE Payment;
-    TRUNCATE TABLE Wallet;
-    TRUNCATE TABLE Customer_Account;
-    TRUNCATE TABLE Service_Plan;
-    TRUNCATE TABLE Customer_profile;
-    TRUNCATE TABLE E_shop;
-    TRUNCATE TABLE Physical_Shop;
-    TRUNCATE TABLE Shop;
+Exec createAllTables
