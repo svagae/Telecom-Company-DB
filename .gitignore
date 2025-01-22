@@ -1,0 +1,22 @@
+# Ignore Visual Studio temporary files, directories, and build results
+.vs/
+.vscode/
+.idea/
+obj/
+bin/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore SQL Server and other database files
+*.mdf
+*.ldf
+
+# Ignore configuration and sensitive files
+*.config
+*.json
+*.xml
+
+# Ignore logs
+*.log
