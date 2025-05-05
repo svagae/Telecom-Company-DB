@@ -12,7 +12,7 @@ The project combines a SQL database backend hosted in Visual Studio Community wi
 - **Service Plan Management**: Manage various telecom service plans, their features, and pricing.
 - **Billing System**: Automatically calculate and generate billing reports based on customer usage.
 - **Usage Data**: Track telecom usage such as calls, messages, and data consumption.
-- **Reports and Queries**: Generate reports and query the database for specific insights on usage, billing, and customer data.
+- **Reports and Queries**: Generate reports and query the database for specific insights on usage, billing, and customer data
 
 ## Technologies Used
 
